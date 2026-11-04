@@ -1,0 +1,65 @@
+name: Build and Deploy Fun Bot
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**/*.md'
+      - 'openspec/**'
+      - '.qwen/**'
+      - '.agents/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Build and test
+        run: mvn clean verify
+
+      - name: Deploy to VPS
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
+
+          cat > fun.env <<'ENVFILE'
+          BOT_TOKEN=${{ secrets.TOKEN_TG_FUN_BOT }}
+          BOT_DB_URL=${{ secrets.DB_ADDR_FUN_BOT }}
+          BOT_DB_USER=${{ secrets.DB_USER_FUN_BOT }}
+          BOT_DB_PASSWORD=${{ secrets.DB_PASS_FUN_BOT }}
+          BOT_OWNER_CHAT_ID=${{ secrets.FUN_OWNER_CHAT_ID }}
+          FUN_RESOURCES_PATH=${{ secrets.FUN_RESOURCES_PATH }}
+          BOT_PROXY_TYPE=${{ secrets.BOT_PROXY_TYPE }}
+          BOT_PROXY_HOST=${{ secrets.BOT_PROXY_HOST }}
+          BOT_PROXY_PORT=${{ secrets.BOT_PROXY_PORT }}
+          BOT_PROXY_USER=${{ secrets.BOT_PROXY_USER }}
+          BOT_PROXY_PASS=${{ secrets.BOT_PROXY_PASS }}
+          ENVFILE
+
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "install -d -m 700 /etc/telegram-bot /usr/bin/tg_bot_fun"
+          scp fun.env ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:/etc/telegram-bot/fun.env
+          rm -f fun.env
+          scp target/fun-telegram-bot-1.0.jar ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:/usr/bin/tg_bot_fun/
+          scp deploy/fun-telegram-bot.service ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:/etc/systemd/system/fun-telegram-bot.service
+
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+            chmod 600 /etc/telegram-bot/fun.env
+            systemctl daemon-reload
+            systemctl enable fun-telegram-bot
+            systemctl restart fun-telegram-bot
+            sleep 20
+            journalctl -u fun-telegram-bot --no-pager -n 20
+            systemctl is-active fun-telegram-bot
+          EOF
