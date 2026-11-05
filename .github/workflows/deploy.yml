@@ -29,18 +29,29 @@ jobs:
 
       - name: Deploy to VPS
         run: |
+          # Секреты репозитория:
+          # TOKEN_TG_FUN_BOT — токен бота; SERVER_IP/SERVER_USER/SSH_PRIVATE_KEY — доступ к VPS;
+          # DB_ADDR_FUN_BOT/DB_USER_FUN_BOT/DB_PASS_FUN_BOT — база; FUN_OWNER_CHAT_ID — получатель
+          # уведомления; FUN_RESOURCES_PATH — каталог с картинками.
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
 
           cat > fun.env <<'ENVFILE'
+          # Токен Fun-бота из BotFather.
           BOT_TOKEN=${{ secrets.TOKEN_TG_FUN_BOT }}
+          # Адрес БД; 127.0.0.1, потому что бот и БД на одном VPS.
           BOT_DB_URL=${{ secrets.DB_ADDR_FUN_BOT }}
+          # Роль fun_user: права только на shared и fun.
           BOT_DB_USER=${{ secrets.DB_USER_FUN_BOT }}
+          # Пароль роли fun_user.
           BOT_DB_PASSWORD=${{ secrets.DB_PASS_FUN_BOT }}
+          # Кому присылать уведомление о запуске (Telegram user id).
           BOT_OWNER_CHAT_ID=${{ secrets.FUN_OWNER_CHAT_ID }}
+          # Каталог с картинками замера.
           FUN_RESOURCES_PATH=${{ secrets.FUN_RESOURCES_PATH }}
+          # Прокси для Telegram; пустые значения — прямое подключение.
           BOT_PROXY_TYPE=${{ secrets.BOT_PROXY_TYPE }}
           BOT_PROXY_HOST=${{ secrets.BOT_PROXY_HOST }}
           BOT_PROXY_PORT=${{ secrets.BOT_PROXY_PORT }}
