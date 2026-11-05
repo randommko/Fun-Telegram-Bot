@@ -48,18 +48,20 @@ jobs:
           BOT_PROXY_PASS=${{ secrets.BOT_PROXY_PASS }}
           ENVFILE
 
-          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "install -d -m 700 /etc/telegram-bot /usr/bin/tg_bot_fun"
-          scp fun.env ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:/etc/telegram-bot/fun.env
+          scp fun.env ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:/tmp/fun.env
+          scp target/fun-telegram-bot-1.0.jar ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:/tmp/fun-telegram-bot-1.0.jar
+          scp deploy/fun-telegram-bot.service ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:/tmp/fun-telegram-bot.service
           rm -f fun.env
-          scp target/fun-telegram-bot-1.0.jar ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:/usr/bin/tg_bot_fun/
-          scp deploy/fun-telegram-bot.service ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:/etc/systemd/system/fun-telegram-bot.service
 
           ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
-            chmod 600 /etc/telegram-bot/fun.env
-            systemctl daemon-reload
-            systemctl enable fun-telegram-bot
-            systemctl restart fun-telegram-bot
+            sudo -n install -m 600 -o root -g root /tmp/fun.env /etc/telegram-bot/fun.env
+            sudo -n install -m 644 /tmp/fun-telegram-bot-1.0.jar /usr/bin/tg_bot_fun/fun-telegram-bot-1.0.jar
+            sudo -n install -m 644 /tmp/fun-telegram-bot.service /etc/systemd/system/fun-telegram-bot.service
+            sudo -n systemctl daemon-reload
+            sudo -n systemctl enable fun-telegram-bot
+            sudo -n systemctl restart fun-telegram-bot
             sleep 20
             journalctl -u fun-telegram-bot --no-pager -n 20
-            systemctl is-active fun-telegram-bot
+            sudo -n systemctl is-active fun-telegram-bot
+            rm -f /tmp/fun.env /tmp/fun-telegram-bot-1.0.jar /tmp/fun-telegram-bot.service
           EOF
