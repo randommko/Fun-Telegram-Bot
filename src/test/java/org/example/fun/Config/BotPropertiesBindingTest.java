@@ -49,7 +49,11 @@ class BotPropertiesBindingTest {
         values.put("FUN_RESOURCES_PATH", "/opt/fun/resources");
 
         StandardEnvironment environment = new StandardEnvironment();
-        environment.getPropertySources().addFirst(new SystemEnvironmentPropertySource("test-env", values));
+        // Источник должен называться systemEnvironment: только тогда Spring сопоставляет
+        // bot.db.url с BOT_DB_URL. Настоящее окружение убираем, иначе тест зависит от машины.
+        environment.getPropertySources().remove(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME);
+        environment.getPropertySources().addFirst(new SystemEnvironmentPropertySource(
+                StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME, values));
 
         BotProperties bot = Binder.get(environment)
                 .bind("bot", Bindable.of(BotProperties.class))
