@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS fun.pidor_messages (
 CREATE TABLE IF NOT EXISTS fun.pidor_players (
     id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     chat_id bigint NOT NULL,
-    user_id bigint NOT NULL REFERENCES shared.tg_users(user_id),
+    user_id bigint NOT NULL REFERENCES shared.tg_users(user_id) ON DELETE CASCADE,
     created_at timestamp with time zone DEFAULT now(),
     CONSTRAINT pidor_players_un UNIQUE (user_id, chat_id)
 );
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS fun.pidor_stats (
     id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     chat_id bigint NOT NULL,
     date date NOT NULL,
-    user_id bigint NOT NULL REFERENCES shared.tg_users(user_id),
+    user_id bigint NOT NULL REFERENCES shared.tg_users(user_id) ON DELETE CASCADE,
     created_at timestamp with time zone DEFAULT now()
 );
 
@@ -39,11 +39,32 @@ CREATE UNIQUE INDEX IF NOT EXISTS pidor_stats_chat_date_un ON fun.pidor_stats (c
 
 CREATE TABLE IF NOT EXISTS fun.cocksize_stats (
     id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    user_id bigint NOT NULL REFERENCES shared.tg_users(user_id),
+    user_id bigint NOT NULL REFERENCES shared.tg_users(user_id) ON DELETE CASCADE,
     size integer NOT NULL,
     date date NOT NULL,
     created_at timestamp with time zone DEFAULT now()
 );
+
+-- Удаление пользователя чистит его игровые строки: ключи, созданные до этой миграции,
+-- были NO ACTION. Блок трогает только ключи на shared.tg_users без каскада и
+-- сохраняет их прежние имена (pidor_players_fk, pidor_stats_fk, cocksize_stats_fk).
+DO $$
+DECLARE
+    fk record;
+BEGIN
+    FOR fk IN
+        SELECT conrelid::regclass AS tbl, conname
+        FROM pg_constraint
+        WHERE contype = 'f'
+          AND connamespace = 'fun'::regnamespace
+          AND confrelid = 'shared.tg_users'::regclass
+          AND confdeltype <> 'c'
+    LOOP
+        EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', fk.tbl, fk.conname);
+        EXECUTE format('ALTER TABLE %s ADD CONSTRAINT %I FOREIGN KEY (user_id) '
+                       'REFERENCES shared.tg_users(user_id) ON DELETE CASCADE', fk.tbl, fk.conname);
+    END LOOP;
+END $$;
 
 -- Один замер на пользователя в сутки.
 DELETE FROM fun.cocksize_stats older
